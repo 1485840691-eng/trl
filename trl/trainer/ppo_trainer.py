@@ -729,18 +729,19 @@ class PPOTrainer(BaseTrainer):
                 model_inputs["attention_mask"], dim=1, pad_index=0, pad_first=pad_first
             )
             # Pad across process for input data of ppo_ptx
-            ptx_model_inputs["input_ids"] = self.accelerator.pad_across_processes(
-                ptx_model_inputs["input_ids"],
-                dim=1,
-                pad_index=self.tokenizer.pad_token_id,
-                pad_first=pad_first,
-            )
-            ptx_model_inputs["attention_mask"] = self.accelerator.pad_across_processes(
-                ptx_model_inputs["attention_mask"],
-                dim=1,
-                pad_index=0,
-                pad_first=pad_first
-            )
+            if ptx_model_inputs:
+                ptx_model_inputs["input_ids"] = self.accelerator.pad_across_processes(
+                    ptx_model_inputs["input_ids"],
+                    dim=1,
+                    pad_index=self.tokenizer.pad_token_id,
+                    pad_first=pad_first,
+                )
+                ptx_model_inputs["attention_mask"] = self.accelerator.pad_across_processes(
+                    ptx_model_inputs["attention_mask"],
+                    dim=1,
+                    pad_index=0,
+                    pad_first=pad_first
+                )
 
             if self.is_encoder_decoder:
                 model_inputs["decoder_input_ids"] = self.accelerator.pad_across_processes(
@@ -841,7 +842,10 @@ class PPOTrainer(BaseTrainer):
                     for k in model_inputs_names:
                         mini_batch_dict[k] = batch_dict[k][mini_batch_inds]
                     for k in ptx_model_inputs_names:
-                        mini_batch_dict['ptx_model_inputs'][k] = batch_dict['ptx_model_inputs'][k][mini_batch_inds]
+                        ptx_model_input_bch_data = batch_dict['ptx_model_inputs'][k]
+                        valid_mini_batch_inds = mini_batch_inds[mini_batch_inds < ptx_model_input_bch_data.shape[0]]
+                        if len(valid_mini_batch_inds) > 0:
+                            mini_batch_dict['ptx_model_inputs'][k] = ptx_model_input_bch_data[valid_mini_batch_inds]
                     with self.accelerator.accumulate(self.model):
                         model_inputs = {k: mini_batch_dict[k] for k in model_inputs_names}
 
@@ -1202,10 +1206,12 @@ class PPOTrainer(BaseTrainer):
         ptx_loss = 0
         if ptx_model_inputs:
             ptx_outputs = self.model(**ptx_model_inputs)
-            if isinstance(ptx_outputs, dict):
-                ptx_loss = ptx_outputs['loss']
-            elif isinstance(ptx_outputs, tuple):
-                ptx_loss = ptx_outputs[1]
+            if isinstance(ptx_outputs, tuple) or isinstance(ptx_outputs, list):
+                ptx_loss = ptx_outputs[1] if len(ptx_outputs) > 1 else 0.0
+            elif isinstance(ptx_outputs, dict):
+                ptx_loss = ptx_outputs.get('loss', 0.0)
+            else:
+                ptx_loss = getattr(ptx_outputs, 'loss', 0.0)
         loss += self.ptx_loss_args.ptx_coef * ptx_loss
 
         self.accelerator.backward(loss)
