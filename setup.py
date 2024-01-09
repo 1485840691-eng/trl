@@ -57,20 +57,27 @@ To create the package for pypi.
 from setuptools import find_packages, setup
 
 
-__version__ = "0.4.8.dev0"  # expected format is one of x.y.z.dev0, or x.y.z.rc1 or x.y.z (no to dashes, yes to dots)
+__version__ = "0.7.8.dev0"  # expected format is one of x.y.z.dev0, or x.y.z.rc1 or x.y.z (no to dashes, yes to dots)
 
 REQUIRED_PKGS = [
     "torch>=1.4.0",
-    "transformers>=4.18.0",
+    "transformers>=4.31.0",
     "numpy>=1.18.2",
     "accelerate",
     "datasets",
+    "tyro>=0.5.11",
 ]
 EXTRAS = {
-    "test": ["parameterized", "pytest", "pytest-xdist", "accelerate", "peft"],
-    "peft": ["peft>=0.2.0"],
-    "dev": ["parameterized", "pytest", "pytest-xdist", "pre-commit", "peft>=0.2.0"],
+    "test": ["parameterized", "pytest", "pytest-xdist", "accelerate"],
+    "peft": ["peft>=0.4.0"],
+    "diffusers": ["diffusers>=0.18.0"],
+    "deepspeed": ["deepspeed>=0.9.5"],
+    "benchmark": ["wandb", "ghapi", "openrlbenchmark==0.2.1a5", "requests", "deepspeed"],
+    "quantization": ["bitsandbytes<=0.41.1"],
 }
+EXTRAS["dev"] = []
+for reqs in EXTRAS.values():
+    EXTRAS["dev"].extend(reqs)
 
 setup(
     name="trl",
@@ -88,7 +95,7 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
     ],
-    url="https://github.com/lvwerra/trl",
+    url="https://github.com/huggingface/trl",
     packages=find_packages(),
     include_package_data=True,
     install_requires=REQUIRED_PKGS,
@@ -98,7 +105,7 @@ setup(
     long_description_content_type="text/markdown",
     zip_safe=False,
     version=__version__,
-    description="A Pytorch implementation of Proximal Policy Optimization for transfomer language models.",
+    description="Train transformer language models with reinforcement learning.",
     keywords="ppo, transformers, huggingface, gpt2, language modeling, rlhf",
     author="Leandro von Werra",
     author_email="leandro.vonwerra@gmail.com",
